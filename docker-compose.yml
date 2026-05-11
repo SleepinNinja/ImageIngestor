@@ -1,0 +1,68 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: places
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Host port 5433 avoids conflicts with a local PostgreSQL on 5432.
+      # The API and pgAdmin containers connect via the internal Docker network
+      # using db:5432 — the host mapping only matters for external tools (psql, TablePlus, etc.).
+      - "5433:5432"
+    healthcheck:
+      # pg_isready returns 0 only when the server is ready to accept connections.
+      # The api service depends_on service_healthy so it won't start before this passes.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d places"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── API ──────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/places
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      BATCH_SIZE: ${BATCH_SIZE:-10}
+      MAX_CONCURRENCY: ${MAX_CONCURRENCY:-5}
+    ports:
+      # Host port 8001 avoids conflicts with processes already on 8000 (e.g. SSH tunnels).
+      - "8001:8000"
+    depends_on:
+      db:
+        # Wait for the healthcheck to pass before starting the API container.
+        # This guarantees alembic upgrade head can connect on first boot.
+        condition: service_healthy
+    volumes:
+      # Mount static folder so frontend changes don't require a rebuild
+      - ./static:/app/static
+
+  # ── pgAdmin ──────────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      # Suppress the pgAdmin setup wizard on first launch
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5051:80"
+    volumes:
+      # Pre-register the db service so it appears in the browser immediately
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

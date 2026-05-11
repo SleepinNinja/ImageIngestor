@@ -1,0 +1,48 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.eggs
+dist
+build
+*.egg
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# Poetry virtualenv (if POETRY_VIRTUALENVS_CREATE=true locally)
+.venv
+venv
+
+# Environment secrets — never copy into the image
+.env
+.env.*
+!.env.example
+
+# Editor / OS artifacts
+.DS_Store
+*.swp
+*.swo
+.idea
+.vscode
+*.iml
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# pgAdmin config (mounted as volume at runtime, not baked into image)
+pgadmin/
+
+# Docs
+README.md
+CLAUDE.md

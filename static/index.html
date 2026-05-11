@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Places Photo Worker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2e3147;
+      --accent: #5b6af9;
+      --accent-hover: #4a59e8;
+      --danger: #e05252;
+      --danger-hover: #c94343;
+      --success: #3ecf8e;
+      --warn: #f5a623;
+      --text: #e2e4ef;
+      --muted: #6b7280;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,.4);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 0.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 2.5rem;
+      font-size: 0.9rem;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.75rem;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.5rem 1.2rem;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent);  color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: var(--accent-hover); }
+    .btn-danger   { background: var(--danger);  color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: var(--danger-hover); }
+    .btn-ghost    { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-ghost:hover:not(:disabled)    { background: var(--border); }
+
+    /* ── Dropzone ── */
+    #dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    #dropzone.drag-over {
+      border-color: var(--accent);
+      background: rgba(91,106,249,.08);
+    }
+    #dropzone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    #dropzone .dz-icon { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
+    #dropzone .dz-label { display: block; margin-bottom: 0.3rem; font-weight: 500; color: var(--text); }
+    #dropzone .dz-hint  { font-size: 0.78rem; color: var(--muted); }
+
+    .upload-row { display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+    #selectedFile { font-size: 0.82rem; color: var(--muted); }
+
+    /* ── Status grid ── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .stat-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+    .stat-box .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-box .stat-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; }
+    .stat-box.running  .stat-value { color: var(--success); }
+    .stat-box.failed-s .stat-value { color: var(--danger); }
+    .stat-box.warn-s   .stat-value { color: var(--warn); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; margin-top: 1rem; border-radius: 8px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th { background: var(--bg); color: var(--muted); font-weight: 600; text-transform: uppercase;
+         letter-spacing: 0.06em; font-size: 0.72rem; padding: 0.6rem 0.85rem; text-align: left; }
+    td { padding: 0.55rem 0.85rem; border-top: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    .badge {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge-pending { background: rgba(245,166,35,.15);  color: var(--warn); }
+    .badge-done    { background: rgba(62,207,142,.15);  color: var(--success); }
+    .badge-failed  { background: rgba(224,82,82,.15);   color: var(--danger); }
+
+    .photos-count { font-weight: 700; }
+    .place-id-cell { font-family: monospace; font-size: 0.78rem; max-width: 220px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Pagination ── */
+    .pagination { display: flex; gap: 0.6rem; align-items: center; margin-top: 1rem; justify-content: flex-end; }
+    .page-info  { font-size: 0.8rem; color: var(--muted); margin-right: auto; }
+
+    /* ── Filters row ── */
+    .filters-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.875rem;
+    }
+    select:focus { outline: 2px solid var(--accent); }
+
+    /* ── Job control row ── */
+    .job-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.75rem 1.2rem;
+      box-shadow: var(--shadow); font-size: 0.875rem;
+      transform: translateY(120%); opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      max-width: 320px; z-index: 200;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.toast-ok   { border-color: var(--success); color: var(--success); }
+    #toast.toast-err  { border-color: var(--danger);  color: var(--danger); }
+    #toast.toast-info { border-color: var(--accent);  color: var(--accent); }
+
+    /* ── Confirm Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.65);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 2rem; max-width: 400px; width: 90%;
+      box-shadow: var(--shadow);
+    }
+    .modal h3 { margin-bottom: 0.75rem; font-size: 1.1rem; }
+    .modal p  { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div style="text-align:center; padding-top:1rem;">
+    <h1>Places Photo Worker</h1>
+    <p class="subtitle">Upload place IDs → run the worker → browse photo metadata</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 1 — Upload dropzone
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>1 · Upload Place IDs</h2>
+    <div id="dropzone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+      <span class="dz-icon">📄</span>
+      <span class="dz-label">Drop your Excel file here</span>
+      <span class="dz-hint">or click to browse — .xlsx / .xls · column named "place_id"</span>
+    </div>
+    <div class="upload-row">
+      <button class="btn-primary" id="uploadBtn" disabled>Upload</button>
+      <span id="selectedFile">No file selected</span>
+    </div>
+    <div id="uploadResult" style="margin-top:.75rem; font-size:.85rem;"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 2 — Start job
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>2 · Start Worker</h2>
+    <p style="font-size:.875rem; color:var(--muted); margin-bottom:1rem;">
+      The worker claims rows with <code>SELECT … FOR UPDATE SKIP LOCKED</code>,
+      calls the Google Places API, and stores photo metadata as JSONB.
+    </p>
+    <div class="job-row">
+      <button class="btn-primary" id="startBtn">▶ Start Job</button>
+    </div>
+    <div id="startResult" style="margin-top:.75rem; font-size:.85rem;"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 3 — Check status (button only, no auto-polling)
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>3 · Job Status</h2>
+    <p style="font-size:.875rem; color:var(--muted); margin-bottom:1rem;">
+      Click to fetch a one-time snapshot. Status is not polled automatically.
+    </p>
+    <button class="btn-ghost" id="statusBtn">↻ Refresh Status</button>
+    <div id="statusDisplay"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 4 — Stop job (with confirm modal)
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>4 · Stop Worker</h2>
+    <p style="font-size:.875rem; color:var(--muted); margin-bottom:1rem;">
+      Sends a graceful-stop signal. The current batch finishes before the
+      worker exits — no row is left partially written.
+    </p>
+    <button class="btn-danger" id="stopBtn">■ Stop Job</button>
+    <div id="stopResult" style="margin-top:.75rem; font-size:.85rem;"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 5 — Results browser with cursor pagination
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>5 · Browse Results</h2>
+    <div class="filters-row">
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="pending">Pending</option>
+        <option value="done">Done</option>
+        <option value="failed">Failed</option>
+      </select>
+      <select id="limitSelect">
+        <option value="20">20 per page</option>
+        <option value="50">50 per page</option>
+        <option value="100">100 per page</option>
+      </select>
+      <button class="btn-primary" id="loadBtn">Load</button>
+    </div>
+
+    <div class="table-wrap" id="tableWrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Place ID</th>
+            <th>Status</th>
+            <th>Photos</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+    <div class="empty hidden" id="emptyState">No places found for this filter.</div>
+
+    <div class="pagination" id="pagination" style="display:none;">
+      <span class="page-info" id="pageInfo"></span>
+      <button class="btn-ghost" id="prevBtn" disabled>← Prev</button>
+      <button class="btn-ghost" id="nextBtn" disabled>Next →</button>
+    </div>
+  </div>
+</div><!-- /container -->
+
+
+<!-- ─────────────────────────────────────────────────────────────
+     STOP CONFIRM MODAL
+──────────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop hidden" id="stopModal">
+  <div class="modal">
+    <h3>Stop the worker?</h3>
+    <p>
+      The current batch will finish before the worker exits.
+      Any rows already claimed will be written to the database.
+      Are you sure you want to stop?
+    </p>
+    <div class="modal-actions">
+      <button class="btn-ghost"   id="cancelStopBtn">Cancel</button>
+      <button class="btn-danger"  id="confirmStopBtn">Yes, Stop</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script>
+  // ── Toast helper ──────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show toast-${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+  }
+
+  // ── Generic fetch wrapper ─────────────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body) { opts.body = body; }
+    const res = await fetch(path, opts);
+    const ct  = res.headers.get('content-type') || '';
+    const data = ct.includes('application/json') ? await res.json() : await res.text();
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 1 — Upload
+  // ═══════════════════════════════════════════════════════════════════════════
+  const dropzone    = document.getElementById('dropzone');
+  const fileInput   = document.getElementById('fileInput');
+  const uploadBtn   = document.getElementById('uploadBtn');
+  const selectedFile = document.getElementById('selectedFile');
+  const uploadResult = document.getElementById('uploadResult');
+
+  let selectedFileObj = null;
+
+  function onFileChosen(file) {
+    if (!file) return;
+    selectedFileObj = file;
+    selectedFile.textContent = `${file.name}  (${(file.size / 1024).toFixed(1)} KB)`;
+    uploadBtn.disabled = false;
+  }
+
+  // Drag-and-drop events
+  dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    onFileChosen(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => onFileChosen(fileInput.files[0]));
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFileObj) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    uploadResult.textContent = '';
+
+    const fd = new FormData();
+    fd.append('file', selectedFileObj);
+    const { ok, data } = await api('POST', '/places/upload', fd);
+
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+
+    if (ok) {
+      uploadResult.innerHTML =
+        `<span style="color:var(--success)">✓ Inserted: <strong>${data.inserted}</strong>  ·  Skipped (duplicates): <strong>${data.skipped}</strong></span>`;
+      showToast(`Uploaded — ${data.inserted} new place(s)`, 'ok');
+    } else {
+      uploadResult.innerHTML = `<span style="color:var(--danger)">✗ ${data.detail || 'Upload failed'}</span>`;
+      showToast('Upload failed', 'err');
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 2 — Start job
+  // ═══════════════════════════════════════════════════════════════════════════
+  const startBtn    = document.getElementById('startBtn');
+  const startResult = document.getElementById('startResult');
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    startBtn.textContent = 'Starting…';
+    startResult.textContent = '';
+
+    const { ok, data } = await api('POST', '/job/start');
+
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ Start Job';
+
+    if (ok) {
+      startResult.innerHTML = `<span style="color:var(--success)">✓ Worker started — ${data.total} row(s) queued</span>`;
+      showToast('Worker started', 'ok');
+    } else {
+      startResult.innerHTML = `<span style="color:var(--warn)">⚠ ${data.detail || 'Could not start'}</span>`;
+      showToast(data.detail || 'Could not start', 'err');
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 3 — Status (button only, no polling)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const statusBtn     = document.getElementById('statusBtn');
+  const statusDisplay = document.getElementById('statusDisplay');
+
+  function renderStatus(s) {
+    const pct = s.total > 0 ? Math.round((s.processed / s.total) * 100) : 0;
+    const stateLabel = s.running
+      ? '<span style="color:var(--success)">● Running</span>'
+      : s.stop_requested
+        ? '<span style="color:var(--warn)">◌ Stopping…</span>'
+        : '<span style="color:var(--muted)">○ Idle</span>';
+
+    statusDisplay.innerHTML = `
+      <div class="status-grid" style="margin-top:1rem;">
+        <div class="stat-box ${s.running ? 'running' : ''}">
+          <div class="stat-label">State</div>
+          <div class="stat-value" style="font-size:1rem; margin-top:.3rem;">${stateLabel}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Total</div>
+          <div class="stat-value">${s.total.toLocaleString()}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Processed</div>
+          <div class="stat-value" style="color:var(--success)">${s.processed.toLocaleString()}</div>
+        </div>
+        <div class="stat-box failed-s">
+          <div class="stat-label">Failed</div>
+          <div class="stat-value">${s.failed.toLocaleString()}</div>
+        </div>
+        <div class="stat-box warn-s">
+          <div class="stat-label">Progress</div>
+          <div class="stat-value">${pct}%</div>
+        </div>
+      </div>
+    `;
+  }
+
+  statusBtn.addEventListener('click', async () => {
+    statusBtn.disabled = true;
+    statusBtn.textContent = 'Fetching…';
+
+    const { ok, data } = await api('GET', '/job/status');
+
+    statusBtn.disabled = false;
+    statusBtn.textContent = '↻ Refresh Status';
+
+    if (ok) {
+      renderStatus(data);
+    } else {
+      statusDisplay.innerHTML = `<span style="color:var(--danger)">Failed to fetch status</span>`;
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 4 — Stop job (with confirm modal)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const stopBtn       = document.getElementById('stopBtn');
+  const stopResult    = document.getElementById('stopResult');
+  const stopModal     = document.getElementById('stopModal');
+  const cancelStopBtn = document.getElementById('cancelStopBtn');
+  const confirmStopBtn = document.getElementById('confirmStopBtn');
+
+  // Show the confirmation modal instead of stopping immediately
+  stopBtn.addEventListener('click', () => {
+    stopModal.classList.remove('hidden');
+  });
+
+  cancelStopBtn.addEventListener('click', () => {
+    stopModal.classList.add('hidden');
+  });
+
+  // Close modal if user clicks outside the modal box
+  stopModal.addEventListener('click', e => {
+    if (e.target === stopModal) stopModal.classList.add('hidden');
+  });
+
+  confirmStopBtn.addEventListener('click', async () => {
+    stopModal.classList.add('hidden');
+    stopBtn.disabled = true;
+    stopBtn.textContent = 'Stopping…';
+    stopResult.textContent = '';
+
+    const { ok, data } = await api('POST', '/job/stop');
+
+    stopBtn.disabled = false;
+    stopBtn.textContent = '■ Stop Job';
+
+    if (ok) {
+      stopResult.innerHTML = `<span style="color:var(--warn)">⚠ Graceful stop requested — current batch will finish</span>`;
+      showToast('Stop signal sent', 'info');
+    } else {
+      stopResult.innerHTML = `<span style="color:var(--danger)">✗ ${data.detail || 'Stop failed'}</span>`;
+      showToast(data.detail || 'Stop failed', 'err');
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 5 — Results browser with cursor pagination
+  // ═══════════════════════════════════════════════════════════════════════════
+  const loadBtn      = document.getElementById('loadBtn');
+  const resultsBody  = document.getElementById('resultsBody');
+  const tableWrap    = document.getElementById('tableWrap');
+  const emptyState   = document.getElementById('emptyState');
+  const pagination   = document.getElementById('pagination');
+  const prevBtn      = document.getElementById('prevBtn');
+  const nextBtn      = document.getElementById('nextBtn');
+  const pageInfo     = document.getElementById('pageInfo');
+  const statusFilter = document.getElementById('statusFilter');
+  const limitSelect  = document.getElementById('limitSelect');
+
+  // Cursor stack enables "previous page" without OFFSET.
+  // Each entry is the cursor used to fetch the current page.
+  // [0] = first page (fetch from beginning); push/pop as user navigates.
+  let cursorStack = [0];
+  let nextCursor  = null;
+  let totalShown  = 0;
+
+  function statusBadge(s) {
+    const cls = { pending: 'badge-pending', done: 'badge-done', failed: 'badge-failed' }[s] || '';
+    return `<span class="badge ${cls}">${s}</span>`;
+  }
+
+  function renderTable(items) {
+    if (items.length === 0) {
+      tableWrap.style.display = 'none';
+      emptyState.classList.remove('hidden');
+      pagination.style.display = 'none';
+      return;
+    }
+
+    emptyState.classList.add('hidden');
+    tableWrap.style.display = '';
+    pagination.style.display = '';
+
+    resultsBody.innerHTML = items.map(p => {
+      const photoCount = p.photos?.photos?.length ?? '—';
+      const photoCell  = p.status === 'done'
+        ? `<span class="photos-count" style="color:var(--success)">${photoCount}</span>`
+        : `<span style="color:var(--muted)">${photoCount}</span>`;
+
+      return `<tr>
+        <td>${p.id}</td>
+        <td class="place-id-cell" title="${p.place_id}">${p.place_id}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>${photoCell}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function fetchPage(cursor) {
+    const status = statusFilter.value;
+    const limit  = parseInt(limitSelect.value, 10);
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading…';
+
+    const params = new URLSearchParams({ cursor, limit, status });
+    const { ok, data } = await api('GET', `/places?${params}`);
+
+    loadBtn.disabled = false;
+    loadBtn.textContent = 'Load';
+
+    if (!ok) {
+      showToast('Failed to load results', 'err');
+      return;
+    }
+
+    renderTable(data.items);
+    nextCursor = data.next_cursor;
+    totalShown = data.items.length;
+
+    // Update pagination controls
+    prevBtn.disabled = cursorStack.length <= 1; // disabled on first page
+    nextBtn.disabled = nextCursor === null;
+
+    const page = cursorStack.length;
+    pageInfo.textContent = `Page ${page} · ${totalShown} row(s)`;
+  }
+
+  // Load first page on button click
+  loadBtn.addEventListener('click', () => {
+    cursorStack = [0]; // reset to beginning
+    fetchPage(0);
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (nextCursor === null) return;
+    cursorStack.push(nextCursor); // push current page's last cursor
+    fetchPage(nextCursor);
+  });
+
+  prevBtn.addEventListener('click', () => {
+    if (cursorStack.length <= 1) return;
+    cursorStack.pop();                                     // remove current page cursor
+    const prevCursor = cursorStack[cursorStack.length - 1]; // peek at previous
+    fetchPage(prevCursor);
+  });
+</script>
+</body>
+</html>
