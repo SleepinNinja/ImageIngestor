@@ -94,7 +94,7 @@ Connect and enter the password `postgres`.
 | `DATABASE_URL`           | `postgresql://postgres:postgres@db:5432/places`| yes      | asyncpg-compatible PostgreSQL DSN                   |
 | `GOOGLE_PLACES_API_KEY`  | _(empty)_                                      | **yes**  | Google Places API (New) key                         |
 | `BATCH_SIZE`             | `500`                                           | no       | Rows per worker batch                               |
-| `MAX_CONCURRENCY`        | `10`                                            | no       | Max concurrent outbound API calls                   |
+| `MAX_CONCURRENCY`        | `50`                                            | no       | Max concurrent outbound API calls                   |
 | `PGADMIN_DEFAULT_EMAIL`  | `admin@admin.com`                              | no       | pgAdmin login email                                 |
 | `PGADMIN_DEFAULT_PASSWORD`| `admin`                                       | no       | pgAdmin login password                              |
 
@@ -131,14 +131,37 @@ Connect and enter the password `postgres`.
 
 ### `BATCH_SIZE`
 Controls how many rows are claimed per loop iteration. Larger values reduce
-DB round-trips but hold row-level locks for longer during API calls. For the
-default `MAX_CONCURRENCY=5`, a `BATCH_SIZE` of 10–20 is a good starting
-point. Increase if your API quota allows higher throughput.
+DB round-trips but hold row-level locks for longer during API calls.
+Default is `500` — a good balance between DB round-trips and lock duration.
 
 ### `MAX_CONCURRENCY`
 Controls the asyncio `Semaphore` that caps concurrent outbound HTTP requests
 per batch. Set this below your Google API per-second quota. If you hit HTTP
-429s frequently, reduce this value.
+429s frequently, reduce this value. Default is `50`.
+
+### Throughput estimates
+
+Throughput is governed entirely by `MAX_CONCURRENCY` and average API latency —
+batch size only affects DB round-trip frequency:
+
+```
+rows/sec = MAX_CONCURRENCY ÷ avg_API_latency_seconds
+```
+
+Assuming average Google Places API latency of ~200 ms:
+
+| `BATCH_SIZE` | `MAX_CONCURRENCY` | Replicas | Rows / sec | Time for 50 M rows |
+|:------------:|:-----------------:|:--------:|:----------:|:------------------:|
+| 10           | 5                 | 1        | ~25        | ~23 days           |
+| 500          | 50                | 1        | ~250       | ~55 hours          |
+| 500          | 50                | 3        | ~750       | ~18 hours          |
+| 1000         | 100               | 3        | ~1,500     | ~9 hours           |
+
+> **Real ceiling: Google API quota.**
+> A standard billed account allows ~600 requests/minute (~10 req/s).
+> To sustain 50+ req/s you need a quota increase approved by Google.
+> Multiple replicas share the same quota — coordinate with API key rotation
+> or a shared token bucket (see Scaling section).
 
 ### Partial index
 `CREATE INDEX idx_places_photos_null ON places (id) WHERE photos IS NULL`

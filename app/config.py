@@ -16,10 +16,10 @@ class Settings(BaseSettings):
     GOOGLE_PLACES_API_KEY: str = ""
 
     # Number of rows claimed per worker iteration
-    BATCH_SIZE: int = 10
+    BATCH_SIZE: int = 500
 
     # Maximum concurrent outbound HTTP requests to the Places API
-    MAX_CONCURRENCY: int = 5
+    MAX_CONCURRENCY: int = 50
 
     model_config = SettingsConfigDict(
         env_file=".env",
