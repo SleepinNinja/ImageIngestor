@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
-import asyncpg
+import asyncpg  # type: ignore
 
 from app.config import settings
 
@@ -83,7 +83,9 @@ async def fetch_photos_for_place(
 
     for attempt in range(max_retries):
         try:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            async with session.get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     # "photos" key may be absent if the place has no photos
@@ -124,7 +126,9 @@ async def fetch_photos_for_place(
             if attempt < max_retries - 1:
                 await asyncio.sleep(wait)
 
-    logger.error("max retries exhausted for place_id=%s — storing empty photos", place_id)
+    logger.error(
+        "max retries exhausted for place_id=%s — storing empty photos", place_id
+    )
     return []
 
 
@@ -247,7 +251,9 @@ async def run_worker(pool: asyncpg.Pool, job_state: JobState) -> None:
                         job_state.running = False
                         return
 
-                    processed, failed = await process_batch(conn, session, semaphore, rows)
+                    processed, failed = await process_batch(
+                        conn, session, semaphore, rows
+                    )
                     # Transaction commits here, releasing the row-level locks
 
             job_state.processed += processed

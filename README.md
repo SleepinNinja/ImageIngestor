@@ -93,8 +93,8 @@ Connect and enter the password `postgres`.
 |--------------------------|------------------------------------------------|----------|-----------------------------------------------------|
 | `DATABASE_URL`           | `postgresql://postgres:postgres@db:5432/places`| yes      | asyncpg-compatible PostgreSQL DSN                   |
 | `GOOGLE_PLACES_API_KEY`  | _(empty)_                                      | **yes**  | Google Places API (New) key                         |
-| `BATCH_SIZE`             | `10`                                           | no       | Rows per worker batch                               |
-| `MAX_CONCURRENCY`        | `5`                                            | no       | Max concurrent outbound API calls                   |
+| `BATCH_SIZE`             | `500`                                           | no       | Rows per worker batch                               |
+| `MAX_CONCURRENCY`        | `10`                                            | no       | Max concurrent outbound API calls                   |
 | `PGADMIN_DEFAULT_EMAIL`  | `admin@admin.com`                              | no       | pgAdmin login email                                 |
 | `PGADMIN_DEFAULT_PASSWORD`| `admin`                                       | no       | pgAdmin login password                              |
 
